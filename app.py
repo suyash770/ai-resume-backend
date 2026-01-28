@@ -1,6 +1,8 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 
 @app.route("/")
 def home():
@@ -10,11 +12,7 @@ def home():
 def predict():
     data = request.json
     text = data["resume_text"]
-
-    # Dummy result (later we add AI model)
-    result = "Good Resume"
-
-    return jsonify({"result": result})
+    return jsonify({"result": "Resume Received"})
 
 if __name__ == "__main__":
     app.run()
