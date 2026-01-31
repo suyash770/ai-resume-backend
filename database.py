@@ -18,6 +18,14 @@ def init_db():
     conn.close()
 
 
+def clear_candidates():
+    conn = sqlite3.connect("candidates.db")
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM candidates")
+    conn.commit()
+    conn.close()
+
+
 def insert_many(candidates):
     conn = sqlite3.connect("candidates.db")
     cursor = conn.cursor()
