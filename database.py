@@ -18,14 +18,14 @@ def init_db():
     conn.close()
 
 
-def insert_candidate(name, score, matched, missing):
+def insert_many(candidates):
     conn = sqlite3.connect("candidates.db")
     cursor = conn.cursor()
 
-    cursor.execute("""
+    cursor.executemany("""
     INSERT INTO candidates (name, score, matched, missing)
     VALUES (?, ?, ?, ?)
-    """, (name, score, ", ".join(matched), ", ".join(missing)))
+    """, candidates)
 
     conn.commit()
     conn.close()
