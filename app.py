@@ -20,6 +20,7 @@ def predict():
     if "resume_pdf" in request.files:
         pdf_file = request.files["resume_pdf"]
         resume_text = extract_text_from_pdf(pdf_file)
+        pdf_file.seek(0)  # important reset
     else:
         resume_text = ""
 
