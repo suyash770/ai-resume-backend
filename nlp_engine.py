@@ -1,7 +1,7 @@
 SKILLS_DB = [
     "python", "java", "c++", "machine learning", "data science",
-    "sql", "html", "css", "javascript", "flask", "django",
-    "react", "git", "docker", "aws"
+    "sql", "html", "css", "javascript", "flask", "react",
+    "git", "docker", "aws"
 ]
 
 def extract_skills(text):
