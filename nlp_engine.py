@@ -6,8 +6,12 @@ SKILLS_DB = [
 
 def extract_skills(text):
     text = text.lower()
-    found = []
+    skills = []
+
     for skill in SKILLS_DB:
         if skill in text:
-            found.append(skill)
-    return list(set(found))
+            skills.append(skill)
+
+    # Bonus scoring for frequency
+    skills = list(set(skills))
+    return skills

@@ -17,10 +17,15 @@ def home():
 
 @app.route("/predict", methods=["POST"])
 def predict():
+    # 🔹 Get JD text from either text or PDF
     jd_text = request.form.get("jd_text", "")
+
+    if "jd_pdf" in request.files:
+        jd_file = request.files["jd_pdf"]
+        jd_text = extract_text_from_pdf(jd_file)
+
     pdf_files = request.files.getlist("resume_pdfs")
 
-    # 🔥 CLEAR OLD DATA BEFORE NEW ANALYSIS
     clear_candidates()
 
     job_skills = extract_skills(jd_text)
