@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from nlp_engine import extract_skills
+from nlp_engine import extract_skills, calculate_similarity
 from pdf_reader import extract_text_from_pdf
 from database import init_db, insert_many, get_all_candidates, clear_candidates
 
@@ -17,27 +17,27 @@ def home():
 
 @app.route("/predict", methods=["POST"])
 def predict():
-    # 🔹 Get JD text from either text or PDF
     jd_text = request.form.get("jd_text", "")
 
     if "jd_pdf" in request.files:
-        jd_file = request.files["jd_pdf"]
-        jd_text = extract_text_from_pdf(jd_file)
+        jd_text = extract_text_from_pdf(request.files["jd_pdf"])
 
     pdf_files = request.files.getlist("resume_pdfs")
 
     clear_candidates()
-
-    job_skills = extract_skills(jd_text)
     candidates_to_save = []
 
     for pdf_file in pdf_files:
         resume_text = extract_text_from_pdf(pdf_file)
+
+        # 🔥 REAL AI SCORE
+        score = calculate_similarity(resume_text, jd_text)
+
         resume_skills = extract_skills(resume_text)
+        job_skills = extract_skills(jd_text)
 
         matched = list(set(resume_skills) & set(job_skills))
         missing = list(set(job_skills) - set(matched))
-        score = int((len(matched) / len(job_skills)) * 100) if job_skills else 0
 
         candidates_to_save.append(
             (pdf_file.filename, score, ", ".join(matched), ", ".join(missing))
