@@ -124,6 +124,19 @@ def candidates():
         }
         for r in rows
     ])
+@app.route("/reset", methods=["POST"])
+def reset():
+    user_id = session.get("user_id")
+
+    import sqlite3
+    conn = sqlite3.connect("candidates.db")
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM candidates WHERE user_id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+
+    return jsonify({"message": "Session cleared"})
 
 
 if __name__ == "__main__":
