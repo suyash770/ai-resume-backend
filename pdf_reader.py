@@ -1,10 +1,8 @@
-from pdfminer.high_level import extract_text
-import tempfile
+import fitz  # PyMuPDF
 
 def extract_text_from_pdf(file):
-    with tempfile.NamedTemporaryFile(delete=False) as tmp:
-        tmp.write(file.read())
-        tmp_path = tmp.name
-
-    text = extract_text(tmp_path)
+    text = ""
+    with fitz.open(stream=file.read(), filetype="pdf") as doc:
+        for page in doc:
+            text += page.get_text()
     return text
