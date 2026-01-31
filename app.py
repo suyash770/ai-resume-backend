@@ -7,7 +7,7 @@ from database import init_db, insert_candidate, get_all_candidates
 app = Flask(__name__)
 CORS(app)
 
-# Initialize database when server starts
+# Initialize database
 init_db()
 
 
@@ -19,34 +19,26 @@ def home():
 @app.route("/predict", methods=["POST"])
 def predict():
     jd_text = request.form.get("jd_text", "")
+    pdf_files = request.files.getlist("resume_pdfs")
 
-    # Read resume from uploaded PDF
-    if "resume_pdf" in request.files:
-        pdf_file = request.files["resume_pdf"]
-        resume_text = extract_text_from_pdf(pdf_file)
-        pdf_file.seek(0)
-    else:
-        resume_text = ""
-
-    # Extract skills
-    resume_skills = extract_skills(resume_text)
     job_skills = extract_skills(jd_text)
 
-    # Match & score
-    matched = list(set(resume_skills) & set(job_skills))
-    missing = list(set(job_skills) - set(matched))
-    score = int((len(matched) / len(job_skills)) * 100) if job_skills else 0
+    # Process each uploaded PDF
+    for pdf_file in pdf_files:
+        resume_text = extract_text_from_pdf(pdf_file)
+        pdf_file.seek(0)
 
-    # Save candidate in database
-    name = "Candidate"
-    insert_candidate(name, score, matched, missing)
+        resume_skills = extract_skills(resume_text)
 
-    return jsonify({
-        "score": score,
-        "resume_skills": resume_skills,
-        "matched_skills": matched,
-        "missing_skills": missing
-    })
+        matched = list(set(resume_skills) & set(job_skills))
+        missing = list(set(job_skills) - set(matched))
+        score = int((len(matched) / len(job_skills)) * 100) if job_skills else 0
+
+        # Save candidate using file name
+        name = pdf_file.filename
+        insert_candidate(name, score, matched, missing)
+
+    return jsonify({"message": "All resumes processed"})
 
 
 @app.route("/candidates", methods=["GET"])
