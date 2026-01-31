@@ -2,13 +2,10 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from nlp_engine import extract_skills
 from pdf_reader import extract_text_from_pdf
-from database import init_db, insert_many, get_all_candidates
+from database import insert_many, get_all_candidates
 
 app = Flask(__name__)
 CORS(app)
-
-# Initialize database once when server starts
-init_db()
 
 
 @app.route("/")
@@ -24,7 +21,6 @@ def predict():
     job_skills = extract_skills(jd_text)
     candidates_to_save = []
 
-    # Process each uploaded resume
     for pdf_file in pdf_files:
         resume_text = extract_text_from_pdf(pdf_file)
         resume_skills = extract_skills(resume_text)
@@ -33,34 +29,26 @@ def predict():
         missing = list(set(job_skills) - set(matched))
         score = int((len(matched) / len(job_skills)) * 100) if job_skills else 0
 
-        name = pdf_file.filename
-
-        # Collect data (no DB write here)
         candidates_to_save.append(
-            (name, score, ", ".join(matched), ", ".join(missing))
+            (pdf_file.filename, score, ", ".join(matched), ", ".join(missing))
         )
 
-    # Single fast DB write
     insert_many(candidates_to_save)
 
-    return jsonify({"message": "All resumes processed"})
+    return jsonify({"status": "done"})
 
 
 @app.route("/candidates", methods=["GET"])
 def candidates():
     rows = get_all_candidates()
-    result = []
-
-    for row in rows:
-        result.append({
-            "name": row[0],
-            "score": row[1],
-            "matched": row[2],
-            "missing": row[3]
-        })
-
-    return jsonify(result)
+    return jsonify([
+        {"name": r[0], "score": r[1], "matched": r[2], "missing": r[3]}
+        for r in rows
+    ])
 
 
 if __name__ == "__main__":
+    # ✅ RUN DB INIT ONLY WHEN SERVER STARTS LOCALLY (NOT ON RENDER REQUESTS)
+    from database import init_db
+    init_db()
     app.run()
