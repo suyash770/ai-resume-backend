@@ -1,13 +1,10 @@
-from PyPDF2 import PdfReader
-import io
+from pdfminer.high_level import extract_text
+import tempfile
 
 def extract_text_from_pdf(file):
-    # Convert file to binary stream
-    pdf_stream = io.BytesIO(file.read())
-    reader = PdfReader(pdf_stream)
+    with tempfile.NamedTemporaryFile(delete=False) as tmp:
+        tmp.write(file.read())
+        tmp_path = tmp.name
 
-    text = ""
-    for page in reader.pages:
-        text += page.extract_text() or ""
-
+    text = extract_text(tmp_path)
     return text

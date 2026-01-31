@@ -2,3 +2,4 @@ flask
 flask-cors
 gunicorn
 PyPDF2
+pdfminer.six
