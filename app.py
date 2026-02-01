@@ -138,6 +138,30 @@ def reset():
 
     return jsonify({"message": "Session cleared"})
 
+@app.route("/admin/candidates", methods=["GET"])
+def admin_candidates():
+    if session.get("role") != "admin":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    import sqlite3
+    conn = sqlite3.connect("candidates.db")
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT users.email, candidates.name, candidates.score
+        FROM candidates
+        JOIN users ON candidates.user_id = users.id
+        ORDER BY candidates.score DESC
+    """)
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    return jsonify([
+        {"hr": r[0], "name": r[1], "score": r[2]}
+        for r in rows
+    ])
+
 
 if __name__ == "__main__":
     app.run()
