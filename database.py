@@ -7,6 +7,7 @@ def init_db():
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS candidates (
         user_id INTEGER,
+        session_id TEXT,
         name TEXT,
         score INTEGER,
         matched TEXT,
@@ -24,7 +25,7 @@ def insert_many(candidates):
     cursor = conn.cursor()
 
     cursor.executemany(
-        "INSERT INTO candidates VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO candidates VALUES (?, ?, ?, ?, ?, ?, ?)",
         candidates
     )
 
@@ -44,11 +45,3 @@ def get_candidates_by_user(user_id):
     rows = cursor.fetchall()
     conn.close()
     return rows
-
-
-def clear_candidates():
-    conn = sqlite3.connect("candidates.db")
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM candidates")
-    conn.commit()
-    conn.close()

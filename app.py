@@ -2,8 +2,10 @@ from flask import Flask, request, jsonify, session
 from flask_cors import CORS
 from nlp_engine import extract_skills, calculate_similarity
 from pdf_reader import extract_text_from_pdf
-from database import init_db, insert_many, get_candidates_by_user, clear_candidates
+from database import init_db, insert_many, get_candidates_by_user
 from auth import create_users_table, register_user, verify_user
+import uuid
+import sqlite3
 
 app = Flask(__name__)
 CORS(app)
@@ -19,7 +21,7 @@ def home():
     return "AI Resume ATS Backend Running"
 
 
-# ---------- AUTH ROUTES ----------
+# ---------- AUTH ----------
 @app.route("/register", methods=["POST"])
 def register():
     data = request.json
@@ -63,7 +65,7 @@ def generate_explanation(score, matched, missing):
     )
 
 
-# ---------- PREDICT ----------
+# ---------- PREDICT (NEW SESSION EACH TIME) ----------
 @app.route("/predict", methods=["POST"])
 def predict():
     jd_text = request.form.get("jd_text", "")
@@ -73,7 +75,9 @@ def predict():
 
     pdf_files = request.files.getlist("resume_pdfs")
 
-    clear_candidates()
+    session_id = str(uuid.uuid4())
+    user_id = session.get("user_id")
+
     candidates_to_save = []
 
     for pdf_file in pdf_files:
@@ -89,11 +93,10 @@ def predict():
 
         explanation = generate_explanation(score, matched, missing)
 
-        user_id = session.get("user_id")
-
         candidates_to_save.append(
             (
                 user_id,
+                session_id,
                 pdf_file.filename,
                 score,
                 ", ".join(matched),
@@ -107,58 +110,80 @@ def predict():
     return jsonify({"status": "done"})
 
 
-# ---------- GET CANDIDATES (USER WISE) ----------
+# ---------- GET LATEST SESSION CANDIDATES ----------
 @app.route("/candidates", methods=["GET"])
 def candidates():
     user_id = session.get("user_id")
 
-    rows = get_candidates_by_user(user_id)
-
-    return jsonify([
-        {
-            "name": r[1],
-            "score": r[2],
-            "matched": r[3],
-            "missing": r[4],
-            "explanation": r[5]
-        }
-        for r in rows
-    ])
-@app.route("/reset", methods=["POST"])
-def reset():
-    user_id = session.get("user_id")
-
-    import sqlite3
-    conn = sqlite3.connect("candidates.db")
-    cursor = conn.cursor()
-
-    cursor.execute("DELETE FROM candidates WHERE user_id = ?", (user_id,))
-    conn.commit()
-    conn.close()
-
-    return jsonify({"message": "Session cleared"})
-
-@app.route("/admin/candidates", methods=["GET"])
-def admin_candidates():
-    if session.get("role") != "admin":
-        return jsonify({"error": "Unauthorized"}), 403
-
-    import sqlite3
     conn = sqlite3.connect("candidates.db")
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT users.email, candidates.name, candidates.score
-        FROM candidates
-        JOIN users ON candidates.user_id = users.id
-        ORDER BY candidates.score DESC
-    """)
+        SELECT * FROM candidates
+        WHERE user_id = ?
+        ORDER BY rowid DESC
+    """, (user_id,))
 
     rows = cursor.fetchall()
     conn.close()
 
     return jsonify([
-        {"hr": r[0], "name": r[1], "score": r[2]}
+        {
+            "name": r[2],
+            "score": r[3],
+            "matched": r[4],
+            "missing": r[5],
+            "explanation": r[6]
+        }
+        for r in rows
+    ])
+
+
+# ---------- LIST SESSIONS ----------
+@app.route("/sessions", methods=["GET"])
+def sessions():
+    user_id = session.get("user_id")
+
+    conn = sqlite3.connect("candidates.db")
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT DISTINCT session_id
+        FROM candidates
+        WHERE user_id = ?
+        ORDER BY rowid DESC
+    """, (user_id,))
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    return jsonify([r[0] for r in rows])
+
+
+# ---------- GET SESSION DATA ----------
+@app.route("/session/<sid>", methods=["GET"])
+def session_data(sid):
+    user_id = session.get("user_id")
+
+    conn = sqlite3.connect("candidates.db")
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT * FROM candidates
+        WHERE user_id = ? AND session_id = ?
+    """, (user_id, sid))
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    return jsonify([
+        {
+            "name": r[2],
+            "score": r[3],
+            "matched": r[4],
+            "missing": r[5],
+            "explanation": r[6]
+        }
         for r in rows
     ])
 
