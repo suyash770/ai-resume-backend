@@ -1,5 +1,5 @@
 import sqlite3
-from werkzeug.security import generate_password_hash, check_password_hash
+import hashlib
 
 def create_users_table():
     conn = sqlite3.connect("candidates.db")
@@ -18,15 +18,17 @@ def create_users_table():
     conn.close()
 
 
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
+
+
 def register_user(email, password, role):
     conn = sqlite3.connect("candidates.db")
     cursor = conn.cursor()
 
-    hashed = generate_password_hash(password)
-
     cursor.execute(
         "INSERT INTO users (email, password, role) VALUES (?, ?, ?)",
-        (email, hashed, role)
+        (email, hash_password(password), role)
     )
 
     conn.commit()
@@ -37,10 +39,15 @@ def verify_user(email, password):
     conn = sqlite3.connect("candidates.db")
     cursor = conn.cursor()
 
-    cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
-    user = cursor.fetchone()
+    cursor.execute(
+        "SELECT id, email, role, password FROM users WHERE email = ?",
+        (email,)
+    )
+
+    row = cursor.fetchone()
     conn.close()
 
-    if user and check_password_hash(user[2], password):
-        return {"id": user[0], "email": user[1], "role": user[3]}
+    if row and row[3] == hash_password(password):
+        return {"id": row[0], "email": row[1], "role": row[2]}
+
     return None
