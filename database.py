@@ -4,6 +4,7 @@ def init_db():
     conn = sqlite3.connect("candidates.db")
     cursor = conn.cursor()
 
+    # Create table if not exists
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS candidates (
         user_id INTEGER,
@@ -15,6 +16,13 @@ def init_db():
         explanation TEXT
     )
     """)
+
+    # Check if session_id column exists
+    cursor.execute("PRAGMA table_info(candidates)")
+    columns = [col[1] for col in cursor.fetchall()]
+
+    if "session_id" not in columns:
+        cursor.execute("ALTER TABLE candidates ADD COLUMN session_id TEXT")
 
     conn.commit()
     conn.close()
