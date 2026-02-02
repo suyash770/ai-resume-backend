@@ -4,11 +4,8 @@ def init_db():
     conn = sqlite3.connect("candidates.db")
     cursor = conn.cursor()
 
-    # Force recreate table with correct schema
-    cursor.execute("DROP TABLE IF EXISTS candidates")
-
     cursor.execute("""
-    CREATE TABLE candidates (
+    CREATE TABLE IF NOT EXISTS candidates (
         user_id INTEGER,
         session_id TEXT,
         name TEXT,
@@ -41,7 +38,7 @@ def get_candidates_by_user(user_id):
     cursor = conn.cursor()
 
     cursor.execute(
-        "SELECT * FROM candidates WHERE user_id = ? ORDER BY score DESC",
+        "SELECT * FROM candidates WHERE user_id = ? ORDER BY rowid DESC",
         (user_id,)
     )
 
