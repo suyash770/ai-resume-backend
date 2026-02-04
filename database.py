@@ -1,4 +1,8 @@
 import sqlite3
+import os
+
+if os.path.exists("candidates.db"):
+    os.remove("candidates.db")
 
 def init_db():
     conn = sqlite3.connect("candidates.db")
