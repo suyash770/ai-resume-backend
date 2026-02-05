@@ -1,54 +1,50 @@
 import sqlite3
-import os
-
-if os.path.exists("candidates.db"):
-    os.remove("candidates.db")
 
 def init_db():
     conn = sqlite3.connect("candidates.db")
     cursor = conn.cursor()
 
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS candidates (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            session_id TEXT,
-            name TEXT,
-            score INTEGER,
-            matched TEXT,
-            missing TEXT,
-            explanation TEXT
-        )
+    CREATE TABLE IF NOT EXISTS candidates (
+        name TEXT,
+        score INTEGER,
+        matched TEXT,
+        missing TEXT,
+        explanation TEXT
+    )
     """)
 
     conn.commit()
     conn.close()
 
 
-def insert_many(records):
+def insert_many(candidates):
     conn = sqlite3.connect("candidates.db")
     cursor = conn.cursor()
 
-    cursor.executemany("""
-        INSERT INTO candidates
-        (user_id, session_id, name, score, matched, missing, explanation)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, records)
+    cursor.executemany(
+        "INSERT INTO candidates VALUES (?, ?, ?, ?, ?)",
+        candidates
+    )
 
     conn.commit()
     conn.close()
 
 
-def get_candidates_by_user(user_id):
+def get_all_candidates():
     conn = sqlite3.connect("candidates.db")
     cursor = conn.cursor()
 
-    cursor.execute("""
-        SELECT * FROM candidates
-        WHERE user_id = ?
-        ORDER BY rowid DESC
-    """, (user_id,))
-
+    cursor.execute("SELECT * FROM candidates ORDER BY score DESC")
     rows = cursor.fetchall()
+
     conn.close()
     return rows
+
+
+def clear_candidates():
+    conn = sqlite3.connect("candidates.db")
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM candidates")
+    conn.commit()
+    conn.close()
