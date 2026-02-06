@@ -6,9 +6,10 @@ from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from datetime import datetime
 
-# Required helper modules (Ensure these exist in your project folder)
+# Helper modules (Ensure these files are in your project directory)
 from pdf_reader import extract_text_from_pdf
-from nlp_matcher import match_resume_to_jd
+# Note: Ensure nlp_engine.py contains extract_skills and calculate_similarity
+from nlp_engine import extract_skills, calculate_similarity 
 
 app = Flask(__name__)
 CORS(app)
@@ -20,7 +21,7 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    # Table for all registered users (Admin, HR, Candidates)
+    # Users Table: Stores registered credentials
     cursor.execute('''CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT, 
@@ -29,7 +30,7 @@ def init_db():
         password TEXT, 
         role TEXT)''')
     
-    # Table for candidate analysis results
+    # Candidates Table: Stores ATS analysis history
     cursor.execute('''CREATE TABLE IF NOT EXISTS candidates (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT, 
@@ -40,7 +41,7 @@ def init_db():
         explanation TEXT, 
         timestamp DATETIME)''')
     
-    # Table for system audit logs
+    # Logs Table: For system audit trails
     cursor.execute('''CREATE TABLE IF NOT EXISTS logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_email TEXT, 
@@ -55,7 +56,7 @@ init_db()
 # --- UTILITY FUNCTIONS ---
 
 def extract_email(text):
-    """Regex logic to automate email retrieval from resume text"""
+    """Automated email extraction using Regex"""
     email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
     match = re.search(email_pattern, text)
     return match.group(0) if match else "candidate@example.com"
@@ -75,7 +76,6 @@ def register():
         conn.commit()
         return jsonify({"message": "User registered successfully"}), 201
     except sqlite3.IntegrityError:
-        # Prevents duplicate registrations in the SQLite database
         return jsonify({"error": "This email is already registered!"}), 400
     finally:
         conn.close()
@@ -94,7 +94,7 @@ def login():
 
     if user:
         user_data = dict(user)
-        # Redirect based on the verified role
+        # Determine target dashboard based on verified role
         redirect_page = "admin.html" if user_data['role'] == 'admin' else \
                         "index.html" if user_data['role'] == 'hr' else "candidate.html"
         return jsonify({"user": user_data, "redirect": redirect_page}), 200
@@ -102,7 +102,7 @@ def login():
 
 @app.route('/reset_password', methods=['POST'])
 def reset_password():
-    """Identity verification for password reset"""
+    """Verified password update logic"""
     data = request.json
     email = data.get('email')
     mobile = data.get('mobile')
@@ -122,9 +122,11 @@ def reset_password():
         return jsonify({"message": "Password updated successfully! ✅"}), 200
     
     conn.close()
-    return jsonify({"error": "Identity mismatch. Reset failed."}), 401
+    return jsonify({"error": "Verification failed. Identity mismatch."}), 401
 
 # --- ANALYSIS & LOGGING ---
+
+
 
 @app.route('/predict', methods=['POST'])
 def predict():
@@ -143,27 +145,27 @@ def predict():
         filename = secure_filename(resume_file.filename)
         resume_text = extract_text_from_pdf(resume_file)
         email = extract_email(resume_text)
-        analysis = match_resume_to_jd(resume_text, jd_text)
         
-        # Store analysis result
+        # NLP Processing
+        score = calculate_similarity(resume_text, jd_text)
+        matched = ", ".join(extract_skills(resume_text))
+        
         cursor.execute('''INSERT INTO candidates (name, email, score, matched, missing, explanation, timestamp) 
                           VALUES (?, ?, ?, ?, ?, ?, ?)''', 
-                       (filename, email, analysis['score'], analysis['matched_skills'], 
-                        analysis['missing_skills'], analysis['explanation'], datetime.now()))
+                       (filename, email, score, matched, "N/A", "Automated Analysis", datetime.now()))
         
-        # Log activity for the audit trail
         cursor.execute('INSERT INTO logs (user_email, action, timestamp) VALUES (?, ?, ?)',
                        (hr_email, f"Analyzed Resume: {filename}", datetime.now()))
 
     conn.commit()
     conn.close()
-    return jsonify({"message": "Analysis completed"}), 200
+    return jsonify({"message": "Batch analysis successful"}), 200
 
 # --- ADMINISTRATIVE CONTROL ---
 
 @app.route('/admin/users', methods=['GET'])
 def get_all_users():
-    """Retrieves full user list for Admin panel management"""
+    """Retrieves full user list for Admin management"""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
@@ -174,7 +176,7 @@ def get_all_users():
 
 @app.route('/admin/delete_user/<int:user_id>', methods=['DELETE'])
 def delete_user(user_id):
-    """Deletes user and logs the action"""
+    """Permanently removes user and logs the deletion"""
     admin_email = request.args.get('admin_email')
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -187,7 +189,7 @@ def delete_user(user_id):
 
 @app.route('/admin/logs', methods=['GET'])
 def get_logs():
-    """Fetches system logs"""
+    """Retrieves system logs"""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
@@ -198,7 +200,7 @@ def get_logs():
 
 @app.route('/admin/stats', methods=['GET'])
 def get_stats():
-    """Calculates global dashboard metrics"""
+    """Calculates global metrics for Admin view"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute('SELECT COUNT(*) FROM candidates')
@@ -210,7 +212,7 @@ def get_stats():
 
 @app.route('/candidates', methods=['GET'])
 def get_candidates():
-    """Fetches all candidates for HR dashboard"""
+    """Fetches candidate data for HR view"""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
@@ -220,5 +222,4 @@ def get_candidates():
     return jsonify(candidates), 200
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=5000)
