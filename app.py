@@ -6,7 +6,7 @@ from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from datetime import datetime
 
-# Helper modules (Ensure these files are in your project directory)
+# Required helper modules (Ensure these exist in your project folder)
 from pdf_reader import extract_text_from_pdf
 from nlp_matcher import match_resume_to_jd
 
@@ -20,7 +20,7 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    # Users Table: Stores registered credentials
+    # Table for all registered users (Admin, HR, Candidates)
     cursor.execute('''CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT, 
@@ -29,7 +29,7 @@ def init_db():
         password TEXT, 
         role TEXT)''')
     
-    # Candidates Table: Stores ATS analysis history
+    # Table for candidate analysis results
     cursor.execute('''CREATE TABLE IF NOT EXISTS candidates (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT, 
@@ -40,7 +40,7 @@ def init_db():
         explanation TEXT, 
         timestamp DATETIME)''')
     
-    # Logs Table: For system audit trails
+    # Table for system audit logs
     cursor.execute('''CREATE TABLE IF NOT EXISTS logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_email TEXT, 
@@ -55,7 +55,7 @@ init_db()
 # --- UTILITY FUNCTIONS ---
 
 def extract_email(text):
-    """Automated email extraction using Regex"""
+    """Regex logic to automate email retrieval from resume text"""
     email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
     match = re.search(email_pattern, text)
     return match.group(0) if match else "candidate@example.com"
@@ -75,6 +75,7 @@ def register():
         conn.commit()
         return jsonify({"message": "User registered successfully"}), 201
     except sqlite3.IntegrityError:
+        # Prevents duplicate registrations in the SQLite database
         return jsonify({"error": "This email is already registered!"}), 400
     finally:
         conn.close()
@@ -93,7 +94,7 @@ def login():
 
     if user:
         user_data = dict(user)
-        # Determine target dashboard based on verified role
+        # Redirect based on the verified role
         redirect_page = "admin.html" if user_data['role'] == 'admin' else \
                         "index.html" if user_data['role'] == 'hr' else "candidate.html"
         return jsonify({"user": user_data, "redirect": redirect_page}), 200
@@ -101,7 +102,7 @@ def login():
 
 @app.route('/reset_password', methods=['POST'])
 def reset_password():
-    """Verified password update logic"""
+    """Identity verification for password reset"""
     data = request.json
     email = data.get('email')
     mobile = data.get('mobile')
@@ -121,11 +122,9 @@ def reset_password():
         return jsonify({"message": "Password updated successfully! ✅"}), 200
     
     conn.close()
-    return jsonify({"error": "Verification failed. Identity mismatch."}), 401
+    return jsonify({"error": "Identity mismatch. Reset failed."}), 401
 
 # --- ANALYSIS & LOGGING ---
-
-
 
 @app.route('/predict', methods=['POST'])
 def predict():
@@ -146,23 +145,25 @@ def predict():
         email = extract_email(resume_text)
         analysis = match_resume_to_jd(resume_text, jd_text)
         
+        # Store analysis result
         cursor.execute('''INSERT INTO candidates (name, email, score, matched, missing, explanation, timestamp) 
                           VALUES (?, ?, ?, ?, ?, ?, ?)''', 
                        (filename, email, analysis['score'], analysis['matched_skills'], 
                         analysis['missing_skills'], analysis['explanation'], datetime.now()))
         
+        # Log activity for the audit trail
         cursor.execute('INSERT INTO logs (user_email, action, timestamp) VALUES (?, ?, ?)',
                        (hr_email, f"Analyzed Resume: {filename}", datetime.now()))
 
     conn.commit()
     conn.close()
-    return jsonify({"message": "Batch analysis successful"}), 200
+    return jsonify({"message": "Analysis completed"}), 200
 
 # --- ADMINISTRATIVE CONTROL ---
 
 @app.route('/admin/users', methods=['GET'])
 def get_all_users():
-    """Retrieves full user list for Admin management"""
+    """Retrieves full user list for Admin panel management"""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
@@ -173,7 +174,7 @@ def get_all_users():
 
 @app.route('/admin/delete_user/<int:user_id>', methods=['DELETE'])
 def delete_user(user_id):
-    """Permanently removes user and logs the deletion"""
+    """Deletes user and logs the action"""
     admin_email = request.args.get('admin_email')
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -186,7 +187,7 @@ def delete_user(user_id):
 
 @app.route('/admin/logs', methods=['GET'])
 def get_logs():
-    """Retrieves system logs"""
+    """Fetches system logs"""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
@@ -197,7 +198,7 @@ def get_logs():
 
 @app.route('/admin/stats', methods=['GET'])
 def get_stats():
-    """Calculates global metrics for Admin view"""
+    """Calculates global dashboard metrics"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute('SELECT COUNT(*) FROM candidates')
@@ -209,7 +210,7 @@ def get_stats():
 
 @app.route('/candidates', methods=['GET'])
 def get_candidates():
-    """Fetches candidate data for HR view"""
+    """Fetches all candidates for HR dashboard"""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
